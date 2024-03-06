@@ -68,7 +68,7 @@ type CustomResource struct {
 	// Update an existing resource with a map of input values. Returns a map of resource outputs that match the schema shape.
 	Update func(ctx context.Context, id string, news, olds resource.PropertyMap) (map[string]interface{}, error)
 	// Delete an existing resource. Constructs the resource ID based on input values.
-	Delete func(ctx context.Context, id string, properties resource.PropertyMap) error
+	Delete func(ctx context.Context, id string, previousInputs, state resource.PropertyMap) error
 }
 
 // ResourceDefinition is a combination of the external schema and runtime metadata
@@ -181,6 +181,11 @@ func BuildCustomResources(env *azureEnv.Environment,
 		return nil, err
 	}
 
+	pimRoleManagementPolicy, err := pimRoleManagementPolicy(lookupResource, crudClientFactory)
+	if err != nil {
+		return nil, err
+	}
+
 	resources := []*CustomResource{
 		keyVaultAccessPolicy(armKVClient),
 		// Storage resources.
@@ -191,7 +196,7 @@ func BuildCustomResources(env *azureEnv.Environment,
 		portalDashboard(),
 		customWebApp,
 		customWebAppSlot,
-		pimRoleManagementPolicyDirect(azureClient),
+		pimRoleManagementPolicy,
 	}
 
 	// For Key Vault, we need to use separate token sources for azidentity and for the legacy auth. The
