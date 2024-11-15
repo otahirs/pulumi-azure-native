@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/pulumi/pulumi-azure-native/v2/provider/pkg/openapi"
+	"github.com/pulumi/pulumi-azure-native/v2/provider/pkg/providerlist"
 	"github.com/pulumi/pulumi/pkg/v3/codegen"
 	"gopkg.in/yaml.v3"
 )
@@ -108,6 +109,22 @@ func ReadSpec(path string) (Spec, error) {
 	var curatedVersion Spec
 	err = yaml.Unmarshal(byteValue, &curatedVersion)
 	return curatedVersion, err
+}
+
+func FindInactiveDefaultVersions(defaultVersionLock openapi.DefaultVersionLock, activeVersions providerlist.ProviderListActiveVersionChecker) map[openapi.ProviderName][]openapi.ApiVersion {
+	result := map[openapi.ProviderName][]openapi.ApiVersion{}
+	for providerName, versions := range defaultVersionLock {
+		inactiveVersions := codegen.NewStringSet()
+		for _, version := range versions {
+			if !activeVersions.HasProviderVersion(providerName, version) {
+				inactiveVersions.Add(version)
+			}
+		}
+		if len(inactiveVersions) > 0 {
+			result[providerName] = inactiveVersions.SortedValues()
+		}
+	}
+	return result
 }
 
 func DefaultConfigToDefaultVersionLock(spec ProvidersVersionResources, defaultConfig Spec) (openapi.DefaultVersionLock, error) {
